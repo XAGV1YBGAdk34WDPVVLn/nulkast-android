@@ -1,0 +1,23 @@
+services:
+  android-privacy-studio:
+    build: .
+    image: android-privacy-studio:latest
+    container_name: android-privacy-studio
+    privileged: true
+    network_mode: host
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8245
+      - DATA_DIR=/app/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8245/api/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

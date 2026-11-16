@@ -1,0 +1,28 @@
+{
+  "device_id": "samsung-n976v",
+  "model": "SM-N976V",
+  "retail_name": "Samsung Galaxy Note 10+ 5G (US Verizon)",
+  "codename": "d2xq",
+  "soc": "Qualcomm Snapdragon 855 (SM8150) + X50 5G",
+  "android_version": "12",
+  "api_level": 31,
+  "abi": "arm64-v8a",
+  "bootloader_unlockable": false,
+  "recommended_track": "Track 1 (Surgical USB ADB Zero-Telemetry De-Bloat + Custom Aegis Apps)",
+  "protected_packages": [
+    "com.android.vending",
+    "com.google.android.gms",
+    "com.google.android.gsf",
+    "com.google.android.webview",
+    "com.sec.imsservice",
+    "com.sec.epdg",
+    "com.samsung.advp.imssettings",
+    "com.sec.android.app.camera",
+    "com.samsung.android.service.aircommand",
+    "com.samsung.android.aircommandmanager",
+    "com.samsung.android.sdk.handwriting",
+    "com.samsung.android.service.airviewdictionary",
+    "com.samsung.android.app.notes",
+    "com.samsung.android.lool"
+  ]
+}

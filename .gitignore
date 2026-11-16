@@ -1,0 +1,29 @@
+# Python & Build Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+*.class
+*.dex
+*.jar
+
+# Private Signing Keystores & Local ADB Keys (Auto-generated on build)
+keystore/*.p12
+keystore/*.jks
+*.keystore
+data/adb_keys/
+
+# Local SQLite Runtime State, USB Probes & Generated Binary Artifacts
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/host_usb_probe.json
+data/images/
+data/apks/
+data/rom_workspace/
+
+# Local Agent & IDE Metadata
+.agents/
+.vscode/
+.idea/

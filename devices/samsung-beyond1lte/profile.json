@@ -1,0 +1,13 @@
+{
+  "device_id": "samsung-beyond1lte",
+  "model": "SM-G973F",
+  "retail_name": "Samsung Galaxy S10 (Global Exynos)",
+  "codename": "beyond1lte",
+  "soc": "Samsung Exynos 9820 (8nm)",
+  "android_version": "14 / 15 (LineageOS 21/22)",
+  "api_level": 34,
+  "abi": "arm64-v8a",
+  "bootloader_unlockable": true,
+  "recommended_track": "Track 1 + Track 2 (Official LineageOS 21/22 beyond1lte / Custom GSI)",
+  "lineage_repo": "LineageOS/android_device_samsung_beyond1lte"
+}

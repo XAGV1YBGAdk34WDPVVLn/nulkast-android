@@ -1,0 +1,15 @@
+{
+  "device_id": "pixel-fold-felix",
+  "model": "G9FPL / GPQ72 (Pixel Fold)",
+  "retail_name": "Google Pixel Fold (1st Gen / 9 Pro Fold)",
+  "codename": "felix / comet",
+  "soc": "Google Tensor G2 / G4 + Titan M2 Security Chip",
+  "android_version": "14 / 15 / 16",
+  "api_level": 35,
+  "abi": "arm64-v8a",
+  "form_factor": "foldable_dual_display",
+  "bootloader_unlockable": true,
+  "supports_custom_avb_key_relock": true,
+  "recommended_track": "Track 1 (USB ADB + Aegis Apps) + Track 2 (Full Custom AOSP / GrapheneOS / LineageOS + Custom AVB Key Re-Locking + 100% Carrier VoLTE/5G)",
+  "lineage_graphene_target": "felix"
+}

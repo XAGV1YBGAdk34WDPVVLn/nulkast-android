@@ -1,0 +1,12 @@
+{
+  "device_id": "pixel-generic",
+  "model": "PIXEL-UNLOCKED",
+  "retail_name": "Google Pixel (6a / 7 / 8 / 9 — Factory Unlocked)",
+  "codename": "generic_pixel",
+  "soc": "Google Tensor G1-G4",
+  "android_version": "15",
+  "api_level": 35,
+  "abi": "arm64-v8a",
+  "bootloader_unlockable": true,
+  "recommended_track": "Track 1 + Track 2 (Full Custom AOSP / GrapheneOS + Custom AVB Key Re-Locking)"
+}

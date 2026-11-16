@@ -1,0 +1,29 @@
+{
+  "brand_name": "NulKast",
+  "package_root": "io.nulkast",
+  "ipc_permission": "io.nulkast.permission.IPC_BUS",
+  "keystore_path": "keystore/nulkast-release.p12",
+  "keystore_alias": "nulkast-suite",
+  "apps": {
+    "firewall": {
+      "app_id": "io.nulkast.wall",
+      "display_name": "NulKast Wall",
+      "role": "On-Device VpnService Per-App Firewall, DoT (RFC 7858), CNAME Unmasker, Instant TCP RST+ACK Blocker & DNS Tracker Sinkhole"
+    },
+    "audit": {
+      "app_id": "io.nulkast.audit",
+      "display_name": "NulKast Audit",
+      "role": "Zero-Internet Static APK Exodus Tracker SDK & Runtime Permission X-Ray Scanner with 1-Tap IPC Wall Blocking"
+    },
+    "scrub": {
+      "app_id": "io.nulkast.scrub",
+      "display_name": "NulKast Scrub",
+      "role": "Zero-Internet Lossless Binary JPEG EXIF/GPS Stripper, Tracking URL Sanitizer & Foreground Clipboard Shredder"
+    },
+    "launcher": {
+      "app_id": "io.nulkast.home",
+      "display_name": "NulKast Home",
+      "role": "Optional Zero-Internet Hub App with Live NulKast Wall HUD & Foldable Dual-Pane Layout"
+    }
+  }
+}
