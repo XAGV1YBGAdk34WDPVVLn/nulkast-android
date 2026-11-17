@@ -160,6 +160,26 @@ public final class NulKastNetIntelTest {
         byte[] respBytes = dns.toByteArray();
         String cloaked = PacketEngine.findCloakedTrackerCname(respBytes, respBytes.length, Collections.<String>emptySet());
         check("cname.omtrdc.net".equals(cloaked), "findCloakedTrackerCname unmasks Adobe Analytics CNAME cloaking (cname.omtrdc.net)");
+
+        // Test RFC 9460 HTTPS (TYPE=65) TargetName cloaking detection
+        ByteArrayOutputStream httpsDns = new ByteArrayOutputStream();
+        httpsDns.write(new byte[] {
+            (byte) 0x82, (byte) 0x45, (byte) 0x81, (byte) 0x80,
+            0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00
+        }, 0, 12);
+        writeDnsLabels(httpsDns, "cdn.shop.example.com");
+        httpsDns.write(new byte[] { 0x00, 65, 0x00, 0x01 }, 0, 4); // QTYPE=65 (HTTPS)
+        httpsDns.write(new byte[] { (byte) 0xC0, 0x0C, 0x00, 65, 0x00, 0x01, 0x00, 0x00, 0x00, 60 }, 0, 10);
+        ByteArrayOutputStream svcbRdata = new ByteArrayOutputStream();
+        svcbRdata.write(new byte[] { 0x00, 0x01 }, 0, 2); // SvcPriority = 1
+        writeDnsLabels(svcbRdata, "edge.adform.net"); // TargetName
+        byte[] svcbBytes = svcbRdata.toByteArray();
+        httpsDns.write((svcbBytes.length >>> 8) & 0xFF);
+        httpsDns.write(svcbBytes.length & 0xFF);
+        httpsDns.write(svcbBytes, 0, svcbBytes.length);
+        byte[] httpsResp = httpsDns.toByteArray();
+        String httpsCloaked = PacketEngine.findCloakedTrackerCname(httpsResp, httpsResp.length, Collections.<String>emptySet());
+        check("edge.adform.net".equals(httpsCloaked), "findCloakedTrackerCname unmasks RFC 9460 HTTPS (TYPE=65) TargetName cloaking (edge.adform.net)");
     }
 
     private static void testTrackerDomainAndCompanyAttribution() {

@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
@@ -64,6 +65,7 @@ public final class NulKastVpnService extends VpnService implements Runnable {
     private volatile boolean running = false;
     private ParcelFileDescriptor tunInterface = null;
     private Thread vpnThread = null;
+    private ConnectivityManager.NetworkCallback networkCallback = null;
 
     // Persistent Keep-Alive DoT TLS Socket state
     private SSLSocket keepAliveDotSocket = null;
@@ -141,6 +143,11 @@ public final class NulKastVpnService extends VpnService implements Runnable {
                 .addDnsServer("10.215.173.2")
                 .addRoute("10.215.173.2", 32);
 
+            // Prevent Android 10+ (API 29+) from treating tun0 as a costly metered cellular network on Wi-Fi
+            if (Build.VERSION.SDK_INT >= 29) {
+                builder.setMetered(false);
+            }
+
             try { builder.addDisallowedApplication(getPackageName()); } catch (Throwable ignored) {}
             try { builder.addDisallowedApplication("com.sec.imsservice"); } catch (Throwable ignored) {}
             try { builder.addDisallowedApplication("com.sec.epdg"); } catch (Throwable ignored) {}
@@ -157,6 +164,7 @@ public final class NulKastVpnService extends VpnService implements Runnable {
             tunInterface = builder.establish();
             if (tunInterface != null) {
                 running = true;
+                registerNetworkHandoffCallback();
                 WallStateStore.setVpnActive(this, true);
                 WallStateStore.recordEvent(this, "[VPN-UP] NulKast Wall tun0 established (blocking I/O + DoT keep-alive)", true);
                 vpnThread = new Thread(this, "NulKastWallTunLoop");
@@ -168,8 +176,48 @@ public final class NulKastVpnService extends VpnService implements Runnable {
         }
     }
 
+    private void registerNetworkHandoffCallback() {
+        if (Build.VERSION.SDK_INT < 24) return;
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return;
+            unregisterNetworkHandoffCallback();
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    try {
+                        setUnderlyingNetworks(network != null ? new Network[] { network } : null);
+                    } catch (Throwable ignored) {}
+                    closeKeepAliveDotSocket();
+                }
+
+                @Override
+                public void onLost(Network network) {
+                    try {
+                        setUnderlyingNetworks(null);
+                    } catch (Throwable ignored) {}
+                    closeKeepAliveDotSocket();
+                }
+            };
+            cm.registerDefaultNetworkCallback(networkCallback);
+        } catch (Throwable ignored) {}
+    }
+
+    private void unregisterNetworkHandoffCallback() {
+        if (networkCallback != null) {
+            try {
+                ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) {
+                    cm.unregisterNetworkCallback(networkCallback);
+                }
+            } catch (Throwable ignored) {}
+            networkCallback = null;
+        }
+    }
+
     private synchronized void stopVpnInternal() {
         running = false;
+        unregisterNetworkHandoffCallback();
         closeKeepAliveDotSocket();
         if (vpnThread != null) {
             vpnThread.interrupt();

@@ -501,10 +501,15 @@ public final class PacketEngine {
             int rdataOffset = pos + 10;
             if (rdataOffset + rdLength > dnsLen) return null;
 
-            if (type == 5) { // CNAME record
+            if (type == 5) { // RFC 1035 CNAME record
                 String cnameTarget = readCompressedDnsName(dnsBuf, dnsLen, rdataOffset, 16);
                 if (cnameTarget != null && isTrackerDomain(cnameTarget, customBlocked)) {
                     return cnameTarget;
+                }
+            } else if ((type == 64 || type == 65) && rdLength > 3) { // RFC 9460 SVCB (64) / HTTPS (65) TargetName
+                String svcbTarget = readCompressedDnsName(dnsBuf, dnsLen, rdataOffset + 2, 16);
+                if (svcbTarget != null && !svcbTarget.isEmpty() && isTrackerDomain(svcbTarget, customBlocked)) {
+                    return svcbTarget;
                 }
             }
             pos = rdataOffset + rdLength;
