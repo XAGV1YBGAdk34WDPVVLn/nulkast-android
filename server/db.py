@@ -1468,6 +1468,26 @@ def init_db() -> None:
                 feedback_json TEXT NOT NULL,
                 collected_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS perf_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_serial TEXT NOT NULL,
+                label TEXT NOT NULL,
+                package_name TEXT NOT NULL,
+                pid INTEGER NOT NULL,
+                cpu_pct REAL NOT NULL,
+                total_pss_kb INTEGER NOT NULL,
+                dalvik_pss_kb INTEGER NOT NULL,
+                native_pss_kb INTEGER NOT NULL,
+                graphics_pss_kb INTEGER NOT NULL,
+                open_fds INTEGER NOT NULL,
+                threads INTEGER NOT NULL,
+                total_frames INTEGER NOT NULL,
+                janky_frames INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                details_json TEXT NOT NULL,
+                collected_at TEXT NOT NULL
+            );
             """
         )
 
@@ -1683,5 +1703,55 @@ def record_telemetry_feedback(snapshot: dict[str, Any]) -> None:
             ),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def record_perf_snapshot(report: dict[str, Any]) -> None:
+    conn = get_conn()
+    try:
+        serial = str(report.get("device_serial") or "unknown")
+        label = str(report.get("label") or "live")
+        collected_at = str(report.get("collected_at") or datetime.now(timezone.utc).isoformat())
+        for app in report.get("apps", []):
+            conn.execute(
+                """
+                INSERT INTO perf_snapshots
+                (device_serial, label, package_name, pid, cpu_pct, total_pss_kb, dalvik_pss_kb,
+                 native_pss_kb, graphics_pss_kb, open_fds, threads, total_frames, janky_frames,
+                 status, details_json, collected_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    serial,
+                    label,
+                    str(app.get("package_name", "")),
+                    int(app.get("pid") or 0),
+                    float(app.get("cpu_pct") or 0.0),
+                    int(app.get("total_pss_kb") or 0),
+                    int(app.get("dalvik_pss_kb") or 0),
+                    int(app.get("native_pss_kb") or 0),
+                    int(app.get("graphics_pss_kb") or 0),
+                    int(app.get("open_fds") or 0),
+                    int(app.get("threads") or 0),
+                    int(app.get("total_frames") or 0),
+                    int(app.get("janky_frames") or 0),
+                    str(app.get("status") or "UNKNOWN"),
+                    json.dumps(app),
+                    collected_at,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def list_perf_snapshots(limit: int = 40) -> list[dict[str, Any]]:
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM perf_snapshots ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()

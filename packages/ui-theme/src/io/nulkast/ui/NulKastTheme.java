@@ -4,8 +4,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -49,9 +52,13 @@ public final class NulKastTheme {
     public static final int ACCENT_RED = Color.parseColor("#F43F5E");
     public static final int ACCENT_RED_DIM = 0x24F43F5E;
 
-    private static final LruCache<String, Drawable> ICON_CACHE = new LruCache<String, Drawable>(180);
+    private static final LruCache<String, Drawable> ICON_CACHE = new LruCache<String, Drawable>(64);
 
     private NulKastTheme() {}
+
+    public static void clearIconCache() {
+        ICON_CACHE.evictAll();
+    }
 
     public static void applyWindowChrome(Activity activity) {
         if (activity == null) return;
@@ -114,10 +121,16 @@ public final class NulKastTheme {
         if (cached != null) return cached;
         try {
             PackageManager pm = ctx.getPackageManager();
-            Drawable d = pm.getApplicationIcon(packageName);
-            if (d != null) {
-                ICON_CACHE.put(packageName, d);
-                return d;
+            Drawable raw = pm.getApplicationIcon(packageName);
+            if (raw != null) {
+                int targetPx = dp(ctx, 38f);
+                Bitmap bmp = Bitmap.createBitmap(targetPx, targetPx, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(bmp);
+                raw.setBounds(0, 0, targetPx, targetPx);
+                raw.draw(canvas);
+                Drawable compact = new BitmapDrawable(ctx.getResources(), bmp);
+                ICON_CACHE.put(packageName, compact);
+                return compact;
             }
         } catch (Throwable ignored) {}
         return ctx.getResources().getDrawable(android.R.drawable.sym_def_app_icon, null);

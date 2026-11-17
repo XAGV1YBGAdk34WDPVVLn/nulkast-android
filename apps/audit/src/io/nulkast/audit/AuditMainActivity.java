@@ -104,7 +104,19 @@ public final class AuditMainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        syncWallStateAndRefresh();
+        if (cachedAudit.isEmpty()) {
+            runAuditScan();
+        } else {
+            syncWallStateAndRefresh();
+        }
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            NulKastTheme.clearIconCache();
+        }
     }
 
     private void buildShellUi() {

@@ -81,6 +81,14 @@ public final class HomeMainActivity extends Activity {
     }
 
     @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            NulKastTheme.clearIconCache();
+        }
+    }
+
+    @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         populateAppGrid();
@@ -334,8 +342,8 @@ public final class HomeMainActivity extends Activity {
             cell.setPadding(p, p, p, p);
 
             ImageView iconIv = new ImageView(this);
-            iconIv.setImageDrawable(info.getBadgedIcon(DisplayMetrics.DENSITY_XXHIGH));
-            int iconSize = NulKastTheme.dp(this, 48);
+            iconIv.setImageDrawable(NulKastTheme.loadAppIcon(this, info.getComponentName().getPackageName()));
+            int iconSize = NulKastTheme.dp(this, 44);
             cell.addView(iconIv, new LinearLayout.LayoutParams(iconSize, iconSize));
 
             TextView lblTv = new TextView(this);

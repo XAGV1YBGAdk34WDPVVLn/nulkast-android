@@ -92,6 +92,12 @@ deploy-apps:
 monitor:
 	docker exec android-privacy-studio python3 cli.py monitor
 
+perf:
+	docker exec android-privacy-studio python3 cli.py perf --label "$(or $(LABEL),live)"
+
+perf-history:
+	docker exec android-privacy-studio python3 cli.py perf --history
+
 test-jvm:
 	docker exec android-privacy-studio python3 scripts/run_jvm_tests.py
 

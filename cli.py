@@ -188,6 +188,20 @@ def cmd_test_blocks(_args: argparse.Namespace) -> None:
     print(json.dumps(res, indent=2))
 
 
+def cmd_perf(args: argparse.Namespace) -> None:
+    db.init_db()
+    if args.history:
+        rows = db.list_perf_snapshots(limit=args.limit)
+        print(json.dumps({"count": len(rows), "snapshots": rows}, indent=2))
+        return
+    from scripts import perf_profiler
+
+    rep = perf_profiler.collect_perf_profile(label=args.label, window_sec=args.window)
+    if rep.get("ok"):
+        db.record_perf_snapshot(rep)
+    print(json.dumps(rep, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Android Custom OS, De-Bloat & Privacy Hardening CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -251,6 +265,12 @@ def main() -> None:
 
     sub.add_parser("test-blocks", help="Run automated live app-blocking & system stability stress test on connected phone")
 
+    p_perf = sub.add_parser("perf", help="Profile live CPU %, Memory PSS, GPU EGL, Threads & Open FDs across NulKast apps")
+    p_perf.add_argument("--label", default="live", help="Snapshot label stored in SQLite perf_snapshots")
+    p_perf.add_argument("--window", type=float, default=2.0, help="CPU sampling window in seconds")
+    p_perf.add_argument("--history", action="store_true", help="List historical perf snapshots from SQLite")
+    p_perf.add_argument("--limit", type=int, default=20, help="Max rows when listing history")
+
     args = parser.parse_args()
     dispatch = {
         "discovery": cmd_discovery,
@@ -269,6 +289,7 @@ def main() -> None:
         "apk": cmd_apk,
         "monitor": cmd_monitor,
         "test-blocks": cmd_test_blocks,
+        "perf": cmd_perf,
     }
     dispatch[args.command](args)
 

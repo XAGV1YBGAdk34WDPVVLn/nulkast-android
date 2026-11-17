@@ -95,6 +95,14 @@ public final class ScrubMainActivity extends Activity {
         }
     }
 
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            NulKastTheme.clearIconCache();
+        }
+    }
+
     private void handleIncomingShareIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getAction();
@@ -209,8 +217,6 @@ public final class ScrubMainActivity extends Activity {
         currentPhotoName = "Sample_Galaxy_Note10_GPS_Photo.jpg (Built-in Demo)";
         updateNavHighlight();
         renderCenterViewport();
-        // Run initial fast header-only scan of device media directories on startup
-        startBatchMediaJob(true);
     }
 
     private void updateNavHighlight() {

@@ -99,6 +99,14 @@ public final class WallMainActivity extends Activity {
         super.onPause();
     }
 
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            NulKastTheme.clearIconCache();
+        }
+    }
+
     private void registerStateObserver() {
         if (stateObserver != null) return;
         stateObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
