@@ -64,14 +64,20 @@ public final class HomeMainActivity extends Activity {
         userManager = (UserManager) getSystemService(USER_SERVICE);
 
         buildUi();
-        registerCallbacks();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        registerCallbacks();
         refreshHud();
         populateAppGrid();
+    }
+
+    @Override
+    protected void onPause() {
+        unregisterCallbacks();
+        super.onPause();
     }
 
     @Override
@@ -82,23 +88,31 @@ public final class HomeMainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (hudObserver != null) {
-            try { getContentResolver().unregisterContentObserver(hudObserver); } catch (Throwable ignored) {}
-        }
-        if (launcherApps != null && pkgCallback != null) {
-            try { launcherApps.unregisterCallback(pkgCallback); } catch (Throwable ignored) {}
-        }
+        unregisterCallbacks();
         super.onDestroy();
     }
 
+    private void unregisterCallbacks() {
+        if (hudObserver != null) {
+            try { getContentResolver().unregisterContentObserver(hudObserver); } catch (Throwable ignored) {}
+            hudObserver = null;
+        }
+        if (launcherApps != null && pkgCallback != null) {
+            try { launcherApps.unregisterCallback(pkgCallback); } catch (Throwable ignored) {}
+            pkgCallback = null;
+        }
+    }
+
     private void registerCallbacks() {
-        hudObserver = hudClient.registerObserver(new Runnable() {
-            @Override
-            public void run() {
-                refreshHud();
-            }
-        });
-        if (launcherApps != null) {
+        if (hudObserver == null) {
+            hudObserver = hudClient.registerObserver(new Runnable() {
+                @Override
+                public void run() {
+                    refreshHud();
+                }
+            });
+        }
+        if (launcherApps != null && pkgCallback == null) {
             pkgCallback = new LauncherApps.Callback() {
                 @Override public void onPackageRemoved(String pkg, UserHandle user) { populateAppGrid(); }
                 @Override public void onPackageAdded(String pkg, UserHandle user) { populateAppGrid(); }

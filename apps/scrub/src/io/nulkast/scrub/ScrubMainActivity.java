@@ -526,8 +526,13 @@ public final class ScrubMainActivity extends Activity {
                     getTargetMediaDirs(),
                     dryRun,
                     new BatchMediaScrubber.ProgressListener() {
+                        private long lastUiUpdateMs = 0L;
+
                         @Override
                         public void onProgress(final int filesProcessed, final String currentFileName) {
+                            long now = System.currentTimeMillis();
+                            if (now - lastUiUpdateMs < 150L) return;
+                            lastUiUpdateMs = now;
                             batchProgressLine = "Processed " + filesProcessed + " files (" + currentFileName + ")...";
                             runOnUiThread(new Runnable() {
                                 @Override

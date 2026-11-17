@@ -2,6 +2,7 @@ package io.nulkast.netintel;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -88,6 +89,10 @@ public final class PacketEngine {
         "dnsdelegation.io"
     };
 
+    public static final Set<String> BUILTIN_TRACKER_SET = Collections.unmodifiableSet(
+        new HashSet<String>(Arrays.asList(BUILTIN_TRACKER_SUFFIXES))
+    );
+
     public static String identifyTrackerCompany(String domain) {
         if (domain == null || domain.isEmpty()) return "";
         String d = domain.toLowerCase(Locale.US);
@@ -131,24 +136,20 @@ public final class PacketEngine {
         if (PLAY_STORE_WHITELIST.contains(d)) {
             return false;
         }
-        if (customBlocked != null && !customBlocked.isEmpty()) {
-            if (customBlocked.contains(d)) {
-                return true;
-            }
-            int dot = d.indexOf('.');
-            while (dot >= 0 && dot + 1 < d.length()) {
-                String parent = d.substring(dot + 1);
-                if (customBlocked.contains(parent)) {
-                    return true;
-                }
-                dot = d.indexOf('.', dot + 1);
-            }
+        boolean hasCustom = (customBlocked != null && !customBlocked.isEmpty());
+        if (BUILTIN_TRACKER_SET.contains(d) || (hasCustom && customBlocked.contains(d))) {
+            return true;
         }
-        for (String suffix : BUILTIN_TRACKER_SUFFIXES) {
-            String s = suffix.trim();
-            if (d.equals(s) || d.endsWith("." + s)) {
+        int dot = d.indexOf('.');
+        while (dot >= 0 && dot + 1 < d.length()) {
+            String parent = d.substring(dot + 1);
+            if (PLAY_STORE_WHITELIST.contains(parent)) {
+                return false;
+            }
+            if (BUILTIN_TRACKER_SET.contains(parent) || (hasCustom && customBlocked.contains(parent))) {
                 return true;
             }
+            dot = d.indexOf('.', dot + 1);
         }
         return false;
     }

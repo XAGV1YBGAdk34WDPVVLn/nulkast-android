@@ -2,6 +2,7 @@ package io.nulkast.wall;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.PowerManager;
 import io.nulkast.ipcbus.NulKastIpcContract;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -9,12 +10,15 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Thread-safe state store and persistent configuration for NulKast Wall.
+ * Thread-safe, battery-optimized state store and persistent configuration for NulKast Wall.
+ * Uses lock-free `AtomicInteger` counters, 30-second lazy disk flushing, and screen-interactive
+ * 1,000ms debounced Binder IPC notifications (`0` disk writes or Binder wakeups while screen is off).
  */
 public final class WallStateStore {
     private static final String PREFS_NAME = "nulkast_wall_prefs";
@@ -28,36 +32,59 @@ public final class WallStateStore {
     private static final String KEY_UNDO_DOMAINS = "undo_custom_domains";
     private static final String KEY_HAS_UNDO = "has_undo_snapshot";
 
+    private static final long DISK_FLUSH_INTERVAL_MS = 30_000L;
+    private static final long IPC_NOTIFY_DEBOUNCE_MS = 1_000L;
+
     private static volatile boolean vpnActive = false;
     private static volatile boolean stealthLockdown = false;
     private static volatile boolean hasUndo = false;
-    private static volatile int blockedTrackersCount = 0;
-    private static volatile int allowedQueriesCount = 0;
+    private static final AtomicInteger blockedTrackersCount = new AtomicInteger(0);
+    private static final AtomicInteger allowedQueriesCount = new AtomicInteger(0);
+    private static final AtomicLong lastDiskFlushMs = new AtomicLong(0L);
+    private static final AtomicLong lastIpcNotifyMs = new AtomicLong(0L);
+
     private static final Set<String> blockedPackages = Collections.synchronizedSet(new HashSet<String>());
     private static final Set<String> customBlockedDomains = Collections.synchronizedSet(new HashSet<String>());
     private static final Set<String> undoPackages = Collections.synchronizedSet(new HashSet<String>());
     private static final Set<String> undoDomains = Collections.synchronizedSet(new HashSet<String>());
     private static final LinkedList<String> recentEvents = new LinkedList<String>();
+    private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("HH:mm:ss", Locale.US);
+    private static final Date REUSABLE_DATE = new Date();
     private static volatile boolean initialized = false;
 
     private WallStateStore() {}
 
-    public static synchronized void ensureInitialized(Context ctx) {
+    public static void ensureInitialized(Context ctx) {
         if (initialized) return;
-        SharedPreferences sp = ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        stealthLockdown = sp.getBoolean(KEY_STEALTH_LOCKDOWN, false);
-        blockedTrackersCount = sp.getInt(KEY_BLOCKED_COUNT, 0);
-        allowedQueriesCount = sp.getInt(KEY_ALLOWED_COUNT, 0);
-        Set<String> savedPkgs = sp.getStringSet(KEY_BLOCKED_PKGS, Collections.<String>emptySet());
-        if (savedPkgs != null) blockedPackages.addAll(savedPkgs);
-        Set<String> savedDoms = sp.getStringSet(KEY_CUSTOM_DOMAINS, Collections.<String>emptySet());
-        if (savedDoms != null) customBlockedDomains.addAll(savedDoms);
-        hasUndo = sp.getBoolean(KEY_HAS_UNDO, false);
-        Set<String> uPkgs = sp.getStringSet(KEY_UNDO_PKGS, Collections.<String>emptySet());
-        if (uPkgs != null) undoPackages.addAll(uPkgs);
-        Set<String> uDoms = sp.getStringSet(KEY_UNDO_DOMAINS, Collections.<String>emptySet());
-        if (uDoms != null) undoDomains.addAll(uDoms);
-        initialized = true;
+        synchronized (WallStateStore.class) {
+            if (initialized) return;
+            SharedPreferences sp = ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            stealthLockdown = sp.getBoolean(KEY_STEALTH_LOCKDOWN, false);
+            blockedTrackersCount.set(sp.getInt(KEY_BLOCKED_COUNT, 0));
+            allowedQueriesCount.set(sp.getInt(KEY_ALLOWED_COUNT, 0));
+            Set<String> savedPkgs = sp.getStringSet(KEY_BLOCKED_PKGS, Collections.<String>emptySet());
+            if (savedPkgs != null) blockedPackages.addAll(savedPkgs);
+            Set<String> savedDoms = sp.getStringSet(KEY_CUSTOM_DOMAINS, Collections.<String>emptySet());
+            if (savedDoms != null) customBlockedDomains.addAll(savedDoms);
+            hasUndo = sp.getBoolean(KEY_HAS_UNDO, false);
+            Set<String> uPkgs = sp.getStringSet(KEY_UNDO_PKGS, Collections.<String>emptySet());
+            if (uPkgs != null) undoPackages.addAll(uPkgs);
+            Set<String> uDoms = sp.getStringSet(KEY_UNDO_DOMAINS, Collections.<String>emptySet());
+            if (uDoms != null) undoDomains.addAll(uDoms);
+            lastDiskFlushMs.set(System.currentTimeMillis());
+            initialized = true;
+        }
+    }
+
+    public static void flushCountersToDisk(Context ctx) {
+        if (ctx == null || !initialized) return;
+        lastDiskFlushMs.set(System.currentTimeMillis());
+        ctx.getApplicationContext()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_BLOCKED_COUNT, blockedTrackersCount.get())
+            .putInt(KEY_ALLOWED_COUNT, allowedQueriesCount.get())
+            .apply();
     }
 
     public static synchronized void saveUndoSnapshot(Context ctx) {
@@ -105,7 +132,8 @@ public final class WallStateStore {
             .putStringSet(KEY_UNDO_PKGS, new HashSet<String>(undoPackages))
             .putStringSet(KEY_UNDO_DOMAINS, new HashSet<String>(undoDomains))
             .apply();
-        recordEvent(ctx, "[UNDO] Restored previous firewall snapshot (" + blockedPackages.size() + " apps, " + customBlockedDomains.size() + " rules)", true);
+        recordEvent(ctx, "[UNDO] Restored previous firewall snapshot (" + blockedPackages.size() + " apps, " + customBlockedDomains.size() + " rules)", false);
+        notifyIpc(ctx, true);
         return true;
     }
 
@@ -122,7 +150,8 @@ public final class WallStateStore {
             .putStringSet(KEY_BLOCKED_PKGS, Collections.<String>emptySet())
             .putStringSet(KEY_CUSTOM_DOMAINS, Collections.<String>emptySet())
             .apply();
-        recordEvent(ctx, "[NORMAL-STATE] Reset to Normal State (0 apps blocked, Undo saved)", true);
+        recordEvent(ctx, "[NORMAL-STATE] Reset to Normal State (0 apps blocked, Undo saved)", false);
+        notifyIpc(ctx, true);
     }
 
     public static synchronized void applyPresetOrRulepack(
@@ -161,8 +190,9 @@ public final class WallStateStore {
         recordEvent(
             ctx,
             "[PRESET] Applied '" + presetName + "' (" + blockedPackages.size() + " apps, " + customBlockedDomains.size() + " custom domains)",
-            true
+            false
         );
+        notifyIpc(ctx, true);
     }
 
     public static boolean isVpnActive() {
@@ -176,8 +206,10 @@ public final class WallStateStore {
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_VPN_ENABLED, active)
+            .putInt(KEY_BLOCKED_COUNT, blockedTrackersCount.get())
+            .putInt(KEY_ALLOWED_COUNT, allowedQueriesCount.get())
             .apply();
-        notifyIpc(ctx);
+        notifyIpc(ctx, true);
     }
 
     public static boolean wasVpnEnabled(Context ctx) {
@@ -201,7 +233,7 @@ public final class WallStateStore {
             .putBoolean(KEY_STEALTH_LOCKDOWN, enable)
             .apply();
         recordEvent(ctx, enable ? "[LOCKDOWN] Stealth Lockdown ENABLED" : "[LOCKDOWN] Stealth Lockdown DISABLED", false);
-        notifyIpc(ctx);
+        notifyIpc(ctx, true);
     }
 
     public static Set<String> getBlockedPackages(Context ctx) {
@@ -219,7 +251,7 @@ public final class WallStateStore {
     public static void setPackageBlocked(Context ctx, String pkg, boolean blocked) {
         ensureInitialized(ctx);
         if (blocked && io.nulkast.netintel.AppIntelligence.isProtectedCore(pkg)) {
-            return; // Deterministically prevent blocking Protected Core packages
+            return;
         }
         saveUndoSnapshot(ctx);
         if (blocked) {
@@ -235,7 +267,7 @@ public final class WallStateStore {
                 .apply();
         }
         recordEvent(ctx, (blocked ? "[APP-BLOCK] " : "[APP-ALLOW] ") + pkg, false);
-        notifyIpc(ctx);
+        notifyIpc(ctx, true);
     }
 
     public static Set<String> getCustomBlockedDomains(Context ctx) {
@@ -243,6 +275,15 @@ public final class WallStateStore {
         synchronized (customBlockedDomains) {
             return new HashSet<String>(customBlockedDomains);
         }
+    }
+
+    /**
+     * Zero-allocation read-only access to the live synchronized custom blocked domain set
+     * for the hot packet loop in `NulKastVpnService`.
+     */
+    public static Set<String> getCustomBlockedDomainsLiveRef(Context ctx) {
+        ensureInitialized(ctx);
+        return customBlockedDomains;
     }
 
     public static void addCustomBlockedDomain(Context ctx, String domain) {
@@ -259,7 +300,7 @@ public final class WallStateStore {
                 .apply();
         }
         recordEvent(ctx, "[RULE-ADDED] Sinkholed " + clean, false);
-        notifyIpc(ctx);
+        notifyIpc(ctx, true);
     }
 
     public static void removeCustomBlockedDomain(Context ctx, String domain) {
@@ -273,43 +314,44 @@ public final class WallStateStore {
                 .putStringSet(KEY_CUSTOM_DOMAINS, new HashSet<String>(customBlockedDomains))
                 .apply();
         }
-        notifyIpc(ctx);
+        notifyIpc(ctx, true);
     }
 
     public static int getBlockedTrackersCount(Context ctx) {
         ensureInitialized(ctx);
-        return blockedTrackersCount;
+        return blockedTrackersCount.get();
     }
 
     public static int getAllowedQueriesCount(Context ctx) {
         ensureInitialized(ctx);
-        return allowedQueriesCount;
+        return allowedQueriesCount.get();
     }
 
     public static void recordDnsDecision(Context ctx, String appLabel, String domain, boolean blocked) {
         ensureInitialized(ctx);
         if (blocked) {
-            blockedTrackersCount++;
+            blockedTrackersCount.incrementAndGet();
         } else {
-            allowedQueriesCount++;
+            allowedQueriesCount.incrementAndGet();
         }
-        SharedPreferences sp = ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        sp.edit()
-            .putInt(KEY_BLOCKED_COUNT, blockedTrackersCount)
-            .putInt(KEY_ALLOWED_COUNT, allowedQueriesCount)
-            .apply();
+        long now = System.currentTimeMillis();
+        long prevFlush = lastDiskFlushMs.get();
+        if (now - prevFlush >= DISK_FLUSH_INTERVAL_MS && lastDiskFlushMs.compareAndSet(prevFlush, now)) {
+            flushCountersToDisk(ctx);
+        }
         String tag = blocked ? "🛑 BLOCKED" : "✅ ALLOWED";
         recordEvent(ctx, tag + " | " + appLabel + " -> " + domain, true);
     }
 
     public static synchronized void recordEvent(Context ctx, String msg, boolean notify) {
-        String ts = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+        REUSABLE_DATE.setTime(System.currentTimeMillis());
+        String ts = TIME_FMT.format(REUSABLE_DATE);
         recentEvents.addFirst(ts + " " + msg);
         while (recentEvents.size() > 60) {
             recentEvents.removeLast();
         }
         if (notify && ctx != null) {
-            notifyIpc(ctx);
+            notifyIpc(ctx, false);
         }
     }
 
@@ -320,15 +362,29 @@ public final class WallStateStore {
     public static synchronized void clearRecentEvents(Context ctx) {
         recentEvents.clear();
         if (ctx != null) {
-            notifyIpc(ctx);
+            notifyIpc(ctx, true);
         }
     }
 
-    private static void notifyIpc(Context ctx) {
+    private static void notifyIpc(Context ctx, boolean forceImmediate) {
+        if (ctx == null) return;
         try {
-            ctx.getApplicationContext()
-                .getContentResolver()
-                .notifyChange(NulKastIpcContract.CONTENT_URI, null);
+            Context appCtx = ctx.getApplicationContext();
+            if (!forceImmediate) {
+                PowerManager pm = (PowerManager) appCtx.getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isInteractive()) {
+                    // Phone screen is OFF: skip cross-process Binder ContentObserver wakeups completely!
+                    return;
+                }
+                long now = System.currentTimeMillis();
+                long prev = lastIpcNotifyMs.get();
+                if (now - prev < IPC_NOTIFY_DEBOUNCE_MS || !lastIpcNotifyMs.compareAndSet(prev, now)) {
+                    return;
+                }
+            } else {
+                lastIpcNotifyMs.set(System.currentTimeMillis());
+            }
+            appCtx.getContentResolver().notifyChange(NulKastIpcContract.CONTENT_URI, null);
         } catch (Throwable ignored) {}
     }
 }

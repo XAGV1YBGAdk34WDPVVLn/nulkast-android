@@ -79,18 +79,28 @@ public final class WallMainActivity extends Activity {
         NulKastTheme.applyWindowChrome(this);
         WallStateStore.ensureInitialized(this);
         buildThreeZoneShell();
-        registerStateObserver();
     }
 
     @Override
-    protected void onDestroy() {
+    protected void onResume() {
+        super.onResume();
+        registerStateObserver();
+        refreshHeaderState();
+        renderCenterViewport();
+    }
+
+    @Override
+    protected void onPause() {
         if (stateObserver != null) {
             try { getContentResolver().unregisterContentObserver(stateObserver); } catch (Throwable ignored) {}
+            stateObserver = null;
         }
-        super.onDestroy();
+        WallStateStore.flushCountersToDisk(this);
+        super.onPause();
     }
 
     private void registerStateObserver() {
+        if (stateObserver != null) return;
         stateObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
             @Override
             public void onChange(boolean selfChange) {
