@@ -1702,6 +1702,10 @@ def record_telemetry_feedback(snapshot: dict[str, Any]) -> None:
                 str(snapshot.get("collected_at") or datetime.now(timezone.utc).isoformat()),
             ),
         )
+        # Bounded ring-buffer cap: keep at most 250 telemetry rows so DB never fills disk
+        conn.execute(
+            "DELETE FROM telemetry_feedback WHERE id NOT IN (SELECT id FROM telemetry_feedback ORDER BY id DESC LIMIT 250)"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -1741,6 +1745,10 @@ def record_perf_snapshot(report: dict[str, Any]) -> None:
                     collected_at,
                 ),
             )
+        # Bounded ring-buffer cap: keep at most 250 perf rows so DB never fills disk
+        conn.execute(
+            "DELETE FROM perf_snapshots WHERE id NOT IN (SELECT id FROM perf_snapshots ORDER BY id DESC LIMIT 250)"
+        )
         conn.commit()
     finally:
         conn.close()
