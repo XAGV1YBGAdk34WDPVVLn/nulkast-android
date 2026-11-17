@@ -156,7 +156,7 @@ def cmd_apk(args: argparse.Namespace) -> None:
     db.init_db()
     from scripts import build_nulkast_apk
 
-    apps = ["firewall", "audit", "scrub", "launcher"] if args.app == "all" else [args.app]
+    apps = ["firewall", "audit", "scrub", "pulse", "launcher"] if args.app == "all" else [args.app]
     builds = []
     for a in apps:
         b = build_nulkast_apk.build_single_app(a, deploy=args.deploy, launch=args.launch)

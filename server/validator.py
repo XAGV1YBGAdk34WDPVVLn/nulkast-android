@@ -136,10 +136,11 @@ def run_qa_validation() -> dict[str, Any]:
     wall_apk = db.DATA_DIR / "apks" / "nulkast-firewall-release.apk"
     audit_apk = db.DATA_DIR / "apks" / "nulkast-audit-release.apk"
     scrub_apk = db.DATA_DIR / "apks" / "nulkast-scrub-release.apk"
+    pulse_apk = db.DATA_DIR / "apks" / "nulkast-pulse-release.apk"
     home_apk = db.DATA_DIR / "apks" / "nulkast-launcher-release.apk"
     apks_built = all(
         p.exists() and p.stat().st_size > 10000
-        for p in [wall_apk, audit_apk, scrub_apk, home_apk]
+        for p in [wall_apk, audit_apk, scrub_apk, pulse_apk, home_apk]
     )
     jvm_res = run_jvm_tests.run_jvm_suite()
     jvm_ok = bool(jvm_res.get("ok"))
@@ -163,6 +164,7 @@ def run_qa_validation() -> dict[str, Any]:
                 "nulkast_wall_apk_bytes": wall_apk.stat().st_size if wall_apk.exists() else 0,
                 "nulkast_audit_apk_bytes": audit_apk.stat().st_size if audit_apk.exists() else 0,
                 "nulkast_scrub_apk_bytes": scrub_apk.stat().st_size if scrub_apk.exists() else 0,
+                "nulkast_pulse_apk_bytes": pulse_apk.stat().st_size if pulse_apk.exists() else 0,
                 "nulkast_home_apk_bytes": home_apk.stat().st_size if home_apk.exists() else 0,
             },
         }

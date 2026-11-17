@@ -215,6 +215,24 @@ public final class HomeMainActivity extends Activity {
         lpScrub.rightMargin = NulKastTheme.dp(this, 4);
         hudBtnRow.addView(openScrubBtn, lpScrub);
 
+        Button openPulseBtn = new Button(this);
+        openPulseBtn.setText("📊 Pulse");
+        openPulseBtn.setAllCaps(false);
+        openPulseBtn.setTextSize(12f);
+        openPulseBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        openPulseBtn.setTextColor(NulKastTheme.ACCENT_CYAN);
+        openPulseBtn.setBackground(NulKastTheme.cardDrawable(this, NulKastTheme.ACCENT_CYAN_DIM, NulKastTheme.ACCENT_CYAN, 10f));
+        openPulseBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openNulKastApp("io.nulkast.pulse", "io.nulkast.pulse.PulseMainActivity");
+            }
+        });
+        LinearLayout.LayoutParams lpPulse = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        lpPulse.leftMargin = NulKastTheme.dp(this, 4);
+        lpPulse.rightMargin = NulKastTheme.dp(this, 4);
+        hudBtnRow.addView(openPulseBtn, lpPulse);
+
         lockdownBtn = new Button(this);
         lockdownBtn.setAllCaps(false);
         lockdownBtn.setTextSize(12f);

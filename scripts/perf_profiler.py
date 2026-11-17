@@ -23,6 +23,7 @@ NULKAST_PACKAGES = [
     "io.nulkast.wall",
     "io.nulkast.audit",
     "io.nulkast.scrub",
+    "io.nulkast.pulse",
     "io.nulkast.home",
 ]
 

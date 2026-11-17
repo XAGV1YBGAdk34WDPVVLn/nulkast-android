@@ -196,6 +196,44 @@ class RulepacksHandler(BaseJsonHandler):
         self.write_json({"count": len(packs), "rulepacks": packs})
 
 
+class FleetAnalyticsHandler(BaseJsonHandler):
+    def get(self) -> None:
+        db.init_db()
+        perf_rows = db.list_perf_snapshots(limit=20)
+        latest_android = perf_rows[0] if perf_rows else {}
+        telemetry_rows = db.list_telemetry_feedback(limit=10)
+        self.write_json(
+            {
+                "ok": True,
+                "devices": [
+                    {
+                        "id": "sm-n976v",
+                        "name": "Samsung Galaxy Note 10+ 5G (SM-N976V)",
+                        "os": "Android 12 (OneUI 4.1 Hardened // NulKast Suite v2.1)",
+                        "soc": "Qualcomm Snapdragon 855 (8 Cores) • 12GB RAM",
+                        "suite_apps": ["io.nulkast.wall", "io.nulkast.audit", "io.nulkast.scrub", "io.nulkast.pulse", "io.nulkast.home"],
+                        "latest_perf": latest_android,
+                        "perf_history": perf_rows,
+                        "debloated_packages": 89,
+                    },
+                    {
+                        "id": "nocturne",
+                        "name": "Google Pixel Slate (nocturne)",
+                        "os": "NulKast OS 150.0 (Nocturne Turbo Edition + Android 13 ARCVM)",
+                        "soc": "Intel Core i7-8500Y (2C/4T up to 4.20 GHz) • 16GB RAM • 256GB NVMe",
+                        "kernel_flags": "mitigations=off kvm-intel.vmentry_l1d_flush=never",
+                        "extensions": ["NulKast-Block MV3", "NulKast Pulse ChromeOS Studio"],
+                        "thermal_guard": "3-Tier Fanless Loop (COOL_TURBO <55C, WARM_STEPDOWN 55-64C, HOT_CLAMP >=65C)",
+                        "debloated_daemons": 10,
+                        "debloated_arcvm_packages": 20,
+                        "sinkholed_domains": 28,
+                    },
+                ],
+                "telemetry_feedback": telemetry_rows,
+            }
+        )
+
+
 def make_app() -> tornado.web.Application:
     db.init_db()
     return tornado.web.Application(
@@ -212,6 +250,7 @@ def make_app() -> tornado.web.Application:
             (r"/api/image/build", ImageBuildHandler),
             (r"/api/knowledge", KnowledgeHandler),
             (r"/api/rulepacks", RulepacksHandler),
+            (r"/api/fleet", FleetAnalyticsHandler),
             (r"/api/qa", QAHandler),
         ]
     )

@@ -132,6 +132,7 @@ public final class AppIntelligence {
         PROTECTED_CORE_PACKAGES.put("io.nulkast.wall", "PROTECTED • NulKast Wall VpnService host");
         PROTECTED_CORE_PACKAGES.put("io.nulkast.audit", "PROTECTED • NulKast Audit Zero-Internet APK X-Ray");
         PROTECTED_CORE_PACKAGES.put("io.nulkast.scrub", "PROTECTED • NulKast Scrub Zero-Internet Sanitizer");
+        PROTECTED_CORE_PACKAGES.put("io.nulkast.pulse", "PROTECTED • NulKast Pulse Zero-Internet OS Analytics");
         PROTECTED_CORE_PACKAGES.put("io.nulkast.home", "PROTECTED • NulKast Home Zero-Internet Hub");
         PROTECTED_CORE_PACKAGES.put("com.android.vending", "PROTECTED • Google Play Store client");
         PROTECTED_CORE_PACKAGES.put("com.google.android.gms", "PROTECTED • Google Play Services & Push notifications");

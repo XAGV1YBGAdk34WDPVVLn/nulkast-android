@@ -31,6 +31,7 @@ APP_MAIN_ACTIVITIES = {
     "firewall": "io.nulkast.wall/.WallMainActivity",
     "audit": "io.nulkast.audit/.AuditMainActivity",
     "scrub": "io.nulkast.scrub/.ScrubMainActivity",
+    "pulse": "io.nulkast.pulse/.PulseMainActivity",
     "launcher": "io.nulkast.home/.HomeMainActivity",
 }
 
@@ -314,7 +315,7 @@ def main() -> None:
     parser.add_argument("--launch", action="store_true", help="Launch main activity on phone after install")
     args = parser.parse_args()
 
-    apps = ["firewall", "audit", "scrub", "launcher"] if args.app == "all" else [args.app]
+    apps = ["firewall", "audit", "scrub", "pulse", "launcher"] if args.app == "all" else [args.app]
     results = []
     for a in apps:
         results.append(build_single_app(a, deploy=args.deploy, launch=args.launch))

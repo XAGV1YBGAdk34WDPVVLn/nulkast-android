@@ -3,6 +3,7 @@ import io.nulkast.netintel.BatchMediaScrubber;
 import io.nulkast.netintel.JpegExifScrubber;
 import io.nulkast.netintel.Mp4AtomScrubber;
 import io.nulkast.netintel.PacketEngine;
+import io.nulkast.netintel.SystemDiagnosticsParser;
 import io.nulkast.netintel.UrlSanitizer;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -40,6 +41,7 @@ public final class NulKastNetIntelTest {
         testMp4AtomScrubberAndBatchVaultScrubber();
         testUrlSanitizerVectors();
         testAppIntelligenceAndRulepackParser();
+        testSystemDiagnosticsAndChromeOsBridge();
 
         System.out.println("PASS: NulKastNetIntelTest completed " + passed + " deterministic JVM assertions.");
     }
@@ -319,6 +321,36 @@ public final class NulKastNetIntelTest {
         AppIntelligence.ImportedRulepack pack = AppIntelligence.parseRulepackOrHosts(maliciousHosts);
         check(!pack.domains.contains("play.fe.googleapis.com"), "Rulepack parser refuses to block whitelisted Play Store domain");
         check(pack.domains.contains("ads.eviltracker.com") && pack.domains.contains("telemetry.bad.org"), "Rulepack parser imports hosts & AdGuard syntax");
+    }
+
+    private static void testSystemDiagnosticsAndChromeOsBridge() {
+        String sampleMeminfo =
+            "MemTotal:       16384000 kB\n"
+            + "MemFree:         4096000 kB\n"
+            + "MemAvailable:   10240000 kB\n"
+            + "Buffers:          512000 kB\n"
+            + "Cached:          3072000 kB\n"
+            + "SwapTotal:       8192000 kB\n"
+            + "SwapFree:        7168000 kB\n";
+        SystemDiagnosticsParser.MemInfoSnapshot mem = SystemDiagnosticsParser.parseProcMeminfo(sampleMeminfo);
+        check(mem.memTotalMb == 16000L, "parseProcMeminfo parses MemTotal 16000 MB");
+        check(mem.memAvailableMb == 10000L, "parseProcMeminfo parses MemAvailable 10000 MB");
+        check(mem.memUsedMb == 6000L && mem.usedPercent == 37, "parseProcMeminfo computes 6000 MB used (37%)");
+        check(mem.swapTotalMb == 8000L && mem.swapUsedMb == 1000L, "parseProcMeminfo computes ZRAM SwapUsed 1000 MB / 8000 MB");
+
+        String sampleCrosJson =
+            "{\"ts\":\"2026-11-17T04:00:00Z\",\"os_name\":\"NulKast OS 150 (Nocturne Turbo)\",\"board\":\"nocturne\","
+            + "\"cpu_model\":\"Intel Core i7-8500Y\",\"temp_c\":43,\"freq_mhz\":3900,\"watts\":4.85,\"tier\":\"COOL_TURBO\","
+            + "\"load_1m\":0.42,\"mem_used_mb\":3420,\"mem_total_mb\":15948,\"tcp_cc\":\"bbr\",\"swappiness\":15,"
+            + "\"debloated_daemons\":10,\"debloated_arcvm_pkgs\":20,\"sinkholed_domains\":28}";
+        SystemDiagnosticsParser.ChromeOsHostTelemetry cros = SystemDiagnosticsParser.parseChromeOsTelemetryJson(sampleCrosJson);
+        check(cros.available && "nocturne".equals(cros.board), "parseChromeOsTelemetryJson recognizes nocturne board");
+        check(cros.tempC == 43 && "COOL_TURBO".equals(cros.thermalTier), "parseChromeOsTelemetryJson extracts 43C COOL_TURBO");
+        check("bbr".equals(cros.tcpCc) && cros.swappiness == 15, "parseChromeOsTelemetryJson extracts BBR and swappiness=15");
+        check(cros.debloatedDaemons == 10 && cros.debloatedArcvmPkgs == 20, "parseChromeOsTelemetryJson extracts debloated counts");
+
+        int score = SystemDiagnosticsParser.computeResponsivenessScore(mem.usedPercent, cros.tempC, 16.5, true, 87);
+        check(score >= 94 && SystemDiagnosticsParser.computePerformanceGrade(score).startsWith("A+"), "Cool slim system scores A+ (>=94)");
     }
 
     private static void writeDnsLabels(ByteArrayOutputStream out, String domain) {
